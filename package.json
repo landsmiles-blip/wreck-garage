@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "assets": "node scripts/assets.mjs --src assets-src --out public/assets",
-    "sim": "node build/sim/final.js",
+    "sim": "node build/sim/take3.js",
     "build": "node tools/build-dist.mjs",
     "verify": "node tests/verify-static.mjs && node tools/pack-zip.mjs && node tests/check-runtime.mjs"
   },

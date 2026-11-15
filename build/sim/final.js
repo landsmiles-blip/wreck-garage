@@ -1,3 +1,7 @@
+// SUPERSEDED by build/sim/take3.js (Take 3, ledger Letter 007), which imports src/economy.js and so
+// cannot drift from the game. This file models the v2 ladder (10/34/82/165 parts), which no longer
+// ships. Kept unchanged for history so the Letter 002-006 numbers can be re-run. `npm run sim` now
+// runs take3.js.
 // Wreck Garage — Stage 1 Economy & Damage-Clock Simulation (02-standards.md Gate)
 // Deterministic PRNG so results are 100% re-runnable across sessions.
 
