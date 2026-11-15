@@ -16,6 +16,7 @@ export function createSessionLog(host) {
   const now = () => (performance.now() - t0) / 1000;
   const log = {
     steer: new URLSearchParams(window.location.search).get('steer') || 'world',
+    cam: new URLSearchParams(window.location.search).get('cam') || 'v2',
     firstInputAt: null,
     lastInputAt: null,
     longestIdle: 0,
@@ -27,7 +28,8 @@ export function createSessionLog(host) {
   let idleStart = null;
 
   const startRun = () => {
-    run = { startedAt: now(), endedAt: null, tierUps: [], smashes: 0, score: 0, parts: 0, peakTier: 0 };
+    // integrity: one sample every 10 s, to settle Finding 11 (does the damage clock stop?).
+    run = { startedAt: now(), endedAt: null, tierUps: [], smashes: 0, score: 0, parts: 0, peakTier: 0, integrity: [], minIntegrity: 100 };
     log.runs.push(run);
     prevParts = 0;
   };
@@ -48,6 +50,11 @@ export function createSessionLog(host) {
         log.lastInputAt = t;
       } else if (log.firstInputAt != null && idleStart == null) {
         idleStart = t;
+      }
+      if (run && !run.endedAt) {
+        run.minIntegrity = Math.min(run.minIntegrity, state.integrity);
+        const runT = t - run.startedAt;
+        if (runT >= run.integrity.length * 10) run.integrity.push(Math.round(state.integrity));
       }
       if (run && !run.endedAt && state.parts > prevParts) {
         run.smashes++;
@@ -73,7 +80,7 @@ export function createSessionLog(host) {
       if (!el) return;
       const t = now();
       const lines = [
-        `SESSION LOG  steer=${log.steer}`,
+        `SESSION LOG  steer=${log.steer} cam=${log.cam}`,
         `on page ${fmt(t)}  first input ${fmt(log.firstInputAt)}  last input ${fmt(log.lastInputAt)}`,
         `longest idle ${log.longestIdle.toFixed(0)}s  runs ${log.runs.length}`,
       ];
@@ -81,6 +88,7 @@ export function createSessionLog(host) {
         const dur = (r.endedAt ?? t) - r.startedAt;
         const tiers = r.tierUps.map((u) => `T${u.tier}@${u.at}s`).join(' ') || 'no tier-up';
         lines.push(`#${i + 1} ${fmt(dur)}${r.endedAt ? '' : ' (live)'} smashes ${r.smashes} score ${r.score} | ${tiers}`);
+        lines.push(`   integrity /10s: ${r.integrity.join(' ')} (min ${Math.round(r.minIntegrity)})`);
       });
       el.textContent = lines.join('\n');
     },

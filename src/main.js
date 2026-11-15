@@ -7,6 +7,28 @@ import { createPerfProbe } from './probe.js';
 import { createSessionLog } from './session.js';
 import { MODEL_MANIFEST, TIERS, WreckWorld } from './world.js';
 
+// Camera trial (ledger Letters 003-006, Finding 9). ?cam=scaled pulls the chase camera back and up
+// as the truck grows, because at T5 the truck is 1.88 x 1.62 x 1.45 while v2's camera offset is a
+// constant, so the reward (growth) hides the road ahead. Default stays the shipped v2 camera
+// (Rule 11) until Mumathai picks.
+// Not "full proportional" scaling: scaling every distance by the truck's growth keeps the truck
+// the same size on screen at every tier, which erases the transformation the player earned.
+// The T5 offsets are chosen from measured screen coverage (__wreckDebug.measureCoverage), and
+// ?camT5=dist,height overrides them for tuning on the phone.
+const CAM_MODE = new URLSearchParams(window.location.search).get('cam') === 'scaled' ? 'scaled' : 'v2';
+const CAM_T5 = { portrait: { dist: 12.5, height: 7.6, look: 4.2 }, landscape: { dist: 10.8, height: 6.0, look: 5.0 } };
+{
+  const o = new URLSearchParams(window.location.search).get('camT5');
+  const [d, h] = (o || '').split(',').map(Number);
+  if (d > 0 && h > 0) {
+    CAM_T5.portrait.dist = CAM_T5.landscape.dist = d;
+    CAM_T5.portrait.height = CAM_T5.landscape.height = h;
+  }
+}
+// The camera eases toward the new framing over ~0.7 s instead of following the truck's scale,
+// which snaps on tier-up (world.js syncPlayerTierVisuals). Easing it is what stops the lurch.
+const CAM_GROW_RATE = 1.5;
+
 const STRINGS = {
   en: {
     score: 'WRECK SCORE',
@@ -249,6 +271,8 @@ async function boot() {
   window.addEventListener('blur', () => syncPauseAndAudio());
 
   let smoothYaw = Math.PI;
+  let camGrow = 0;
+  const lerp = (a, b, t) => a + (b - a) * t;
   const camTarget = new THREE.Vector3();
   const lookTarget = new THREE.Vector3();
 
@@ -291,6 +315,41 @@ async function boot() {
     forceEndSoonForTest: () => {
       world.player.integrity = 0.2;
     },
+    // Test-only: jump the ladder to tier i (upward only), for camera coverage measurement.
+    setTierForTest: (i) => {
+      world.player.parts = Math.max(world.player.parts, TIERS[i].minParts);
+      world.checkTierAdvance();
+    },
+    // Fraction of the viewport the player's vehicle covers, overall and in the top half (the road
+    // ahead). Renders one frame with only the vehicle visible and counts its pixels.
+    measureCoverage: () => {
+      const hidden = [];
+      scene.children.forEach((o) => {
+        if (o !== world.playerRoot && !o.isLight && o.visible) { o.visible = false; hidden.push(o); }
+      });
+      const bg = scene.background;
+      const fog = scene.fog;
+      scene.background = new THREE.Color(0x000000);
+      scene.fog = null;
+      renderer.render(scene, camera);
+      const gl = renderer.getContext();
+      const w = gl.drawingBufferWidth;
+      const h = gl.drawingBufferHeight;
+      const px = new Uint8Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      hidden.forEach((o) => { o.visible = true; });
+      scene.background = bg;
+      scene.fog = fog;
+      let all = 0;
+      let top = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          if (px[i] + px[i + 1] + px[i + 2] > 24) { all++; if (y >= h / 2) top++; }
+        }
+      }
+      return { tier: world.player.tierIdx + 1, camMode: CAM_MODE, w, h, cover: +(all / (w * h)).toFixed(3), coverTopHalf: +(top / (w * h / 2)).toFixed(3) };
+    },
   };
 
   function tick(now) {
@@ -324,9 +383,13 @@ async function boot() {
     smoothYaw += yawDiff * Math.min(1, dt * 5.2);
 
     // Over-the-shoulder arcade perspective
-    const camDist = portrait ? 7.4 : 6.4;
-    const camHeight = portrait ? 3.8 : 3.0;
-    const lookAhead = portrait ? 3.0 : 3.8;
+    const growTarget = (TIERS[p.tierIdx].scaleY - 1) / (TIERS[TIERS.length - 1].scaleY - 1);
+    camGrow += (growTarget - camGrow) * Math.min(1, dt * CAM_GROW_RATE);
+    const g = CAM_MODE === 'scaled' ? camGrow : 0;
+    const t5 = portrait ? CAM_T5.portrait : CAM_T5.landscape;
+    const camDist = lerp(portrait ? 7.4 : 6.4, t5.dist, g);
+    const camHeight = lerp(portrait ? 3.8 : 3.0, t5.height, g);
+    const lookAhead = lerp(portrait ? 3.0 : 3.8, t5.look, g);
 
     const behindX = p.x - Math.sin(smoothYaw) * camDist;
     const behindZ = p.z - Math.cos(smoothYaw) * camDist;
