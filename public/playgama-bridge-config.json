@@ -1,0 +1,10 @@
+{
+  "platforms": {
+    "youtube": {
+      "minimumDelayBetweenInterstitial": 60
+    },
+    "playgama": {
+      "minimumDelayBetweenInterstitial": 60
+    }
+  }
+}

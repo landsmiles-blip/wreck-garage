@@ -1,0 +1,122 @@
+{
+  "audio/bg_music.wav": {
+    "key": "85403cc78b60fadc134fc8f7e2b0945eaf475e1934270323c2d33b2ee315a278",
+    "outRel": "audio/bg_music.mp3"
+  },
+  "audio/combo_fanfare.ogg": {
+    "key": "b17a86827c12ccb8c341851cbafa7379a543be51b34f0ecc67cf9f7e67096826",
+    "outRel": "audio/combo_fanfare.mp3"
+  },
+  "audio/impact_glass.ogg": {
+    "key": "bfaa35206396dcff2a0f62d459557d07cfde643443c83821ddcae5efb8c7f8ae",
+    "outRel": "audio/impact_glass.mp3"
+  },
+  "audio/impact_metal_heavy.ogg": {
+    "key": "4ee24375dca35201f02f3db06f9702a8ad00c5a06be1b171a42a890fdc8cb019",
+    "outRel": "audio/impact_metal_heavy.mp3"
+  },
+  "audio/impact_metal_light.ogg": {
+    "key": "87711fd73260f77564ca3808b6bfbdee0a7484b86c26eefe56407bc8825a9ee4",
+    "outRel": "audio/impact_metal_light.mp3"
+  },
+  "audio/impact_wood.ogg": {
+    "key": "de93e8cfae80442a3f267c5c3b88c6e2a299b629e7288bb7a0212b956acd3723",
+    "outRel": "audio/impact_wood.mp3"
+  },
+  "audio/repair_pickup.ogg": {
+    "key": "1cf39ce6bf6398f808b130ee5b47ae5129838db62820be00343d9c7d6fb2dfc5",
+    "outRel": "audio/repair_pickup.mp3"
+  },
+  "audio/tier_up.ogg": {
+    "key": "ab1d7f03a11cb08ef72d9673c4eb178e13069a2167ad0c306decf0a2ef2e0f38",
+    "outRel": "audio/tier_up.mp3"
+  },
+  "audio/ui_click.ogg": {
+    "key": "8199863eb74f3dd936eb9cb0da44a11c876f217dbeb3eedf25b31d998686f269",
+    "outRel": "audio/ui_click.mp3"
+  },
+  "models/car-kit/box.glb": {
+    "key": "dca5bedf1f4e29508c48865e33888f4e3f5450c2091a8a8002876ad8b0241219",
+    "outRel": "models/car-kit/box.glb"
+  },
+  "models/car-kit/cone.glb": {
+    "key": "84a6d22263495642fc8941c3e37a66184a15537f1685696fb2e63082fe2c049c",
+    "outRel": "models/car-kit/cone.glb"
+  },
+  "models/car-kit/debris-bolt.glb": {
+    "key": "c3d73bca428f14833a9e440102b5fbfcb66fec6af0489884aacca581dbce7594",
+    "outRel": "models/car-kit/debris-bolt.glb"
+  },
+  "models/car-kit/debris-bumper.glb": {
+    "key": "4b6b84873bf9cae90fce787b6de8295bb5829e1975081bf75636fb7e2e567b15",
+    "outRel": "models/car-kit/debris-bumper.glb"
+  },
+  "models/car-kit/debris-door.glb": {
+    "key": "f8fed314b1a8b859ff51ee7b24f611cb5ace1b0b328a9bdfb09937789cb471b2",
+    "outRel": "models/car-kit/debris-door.glb"
+  },
+  "models/car-kit/debris-plate-a.glb": {
+    "key": "586c1926f332d6acea870949684db4652dc5e686c63d7821082dfb0395d9ae28",
+    "outRel": "models/car-kit/debris-plate-a.glb"
+  },
+  "models/car-kit/debris-spoiler-a.glb": {
+    "key": "9392f4d5006efe7b2e67b217fca3db65788e286e1c6ad7865c4f2e05f34d0485",
+    "outRel": "models/car-kit/debris-spoiler-a.glb"
+  },
+  "models/car-kit/debris-tire.glb": {
+    "key": "0dd33a9eeaa88e46990906f95af94dcb649e95d533eff1ee5e8adbe48786759c",
+    "outRel": "models/car-kit/debris-tire.glb"
+  },
+  "models/car-kit/delivery.glb": {
+    "key": "f0ff0681877eaee19f2847b25d32a08bd4f7e9d691e7dbfe379c05630a135283",
+    "outRel": "models/car-kit/delivery.glb"
+  },
+  "models/car-kit/sedan.glb": {
+    "key": "5bb22d2f6d9ae0de11e631f7155fdf302df3619da72b92c0b690c84983bab697",
+    "outRel": "models/car-kit/sedan.glb"
+  },
+  "models/car-kit/tractor-shovel.glb": {
+    "key": "d0af4b20a255274d9fd8ef8061d7aecba921bce4a94d51d07fbea219f06564ed",
+    "outRel": "models/car-kit/tractor-shovel.glb"
+  },
+  "models/car-kit/truck.glb": {
+    "key": "217210d51a6b2841eb5f6db7a7dfb5a28dcd4cc50e5cd31d774824528e8083ce",
+    "outRel": "models/car-kit/truck.glb"
+  },
+  "models/roads/construction-barrier.glb": {
+    "key": "5aba1f24320a050290e37104329100c5fef723cb12f3b322046d8535420bf95c",
+    "outRel": "models/roads/construction-barrier.glb"
+  },
+  "models/roads/dumpster.glb": {
+    "key": "0da8b7124bf7cd9cb96da10af44704790dea0d79418f8f96808b3ff97159b3ca",
+    "outRel": "models/roads/dumpster.glb"
+  },
+  "models/roads/light-curved.glb": {
+    "key": "2c82b9c2b408982084593ec2f85e1a512d55a6c702fb557c97d59c750ba7a22b",
+    "outRel": "models/roads/light-curved.glb"
+  },
+  "models/roads/road-sign-stop.glb": {
+    "key": "4d4daf3287d769df6a4b44a454e3f9a782410088b29dd76ed18f3fdcad1bff2a",
+    "outRel": "models/roads/road-sign-stop.glb"
+  },
+  "models/suburban/building-type-a.glb": {
+    "key": "bdf1f0f6f4479bab2eedba7205a2494eee8795267e86307f97888bfdd30aa68e",
+    "outRel": "models/suburban/building-type-a.glb"
+  },
+  "models/suburban/fence-1x2.glb": {
+    "key": "2003925134aeaa6a7dad5e73cd070014077da71469fcdf32f3d11a96c3cf7f57",
+    "outRel": "models/suburban/fence-1x2.glb"
+  },
+  "models/suburban/fence.glb": {
+    "key": "58a19fcb3b6ca3c3d9e1db46c8d898ed2b1a3ffeecbcee3db3132d73543192b7",
+    "outRel": "models/suburban/fence.glb"
+  },
+  "models/suburban/planter.glb": {
+    "key": "69cdf6211355518ac87e61f0cf1a2c5fd590633a5f7af950c19b6aa105b203bf",
+    "outRel": "models/suburban/planter.glb"
+  },
+  "models/suburban/tree-small.glb": {
+    "key": "aa39daccfe0c29a49a4962aeef668090799f1725523c88f91be08c52aa4c88be",
+    "outRel": "models/suburban/tree-small.glb"
+  }
+}

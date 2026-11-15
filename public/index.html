@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Wreck Garage</title>
+  <link rel="icon" href="data:," />
+  <script src="vendor/playgama-bridge.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="game-canvas" aria-label="Wreck Garage 3D Arena"></canvas>
+
+  <div id="hud" class="hud">
+    <div class="hud-left">
+      <div class="score-pill">
+        <span class="label" id="lbl-score">WRECK SCORE</span>
+        <span class="val" id="val-score">0</span>
+      </div>
+      <div class="combo-pill hidden" id="combo-pill">
+        <div class="combo-head">
+          <span class="combo-mult" id="val-combo-mult">2x</span>
+          <span class="combo-lbl" id="val-combo-lbl">CRUNCH!</span>
+        </div>
+        <div class="combo-track"><div class="combo-fill" id="combo-fill"></div></div>
+      </div>
+      <div class="tier-pill" id="tier-pill">
+        <span id="val-tier">T1 Rust-Bucket</span>
+        <div class="tier-track"><div class="tier-fill" id="tier-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="hud-center">
+      <div class="integrity-wrap">
+        <span class="label" id="lbl-integrity">INTEGRITY</span>
+        <div class="integrity-track">
+          <div class="integrity-fill" id="integrity-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <button id="btn-mute" class="icon-btn" type="button" aria-label="Mute or unmute sound">🔊</button>
+      <button id="btn-pause" class="icon-btn" type="button" aria-label="Pause game">⏸</button>
+    </div>
+  </div>
+
+  <div id="cue-banner" class="cue-banner">
+    <div class="cue-chip" id="lbl-cue">DRAG ANYWHERE OR WASD TO SMASH!</div>
+  </div>
+
+  <div id="toast-feed" class="toast-feed"></div>
+
+  <div id="pause-overlay" class="overlay hidden" role="dialog" aria-modal="true">
+    <div class="card">
+      <h2 id="lbl-paused">PAUSED</h2>
+      <p id="lbl-pause-sub">Garage crew standing by.</p>
+      <button id="btn-resume" class="cta-btn" type="button">RESUME</button>
+    </div>
+  </div>
+
+  <div id="end-overlay" class="overlay hidden" role="dialog" aria-modal="true">
+    <div class="card">
+      <div class="badge" id="lbl-run-badge">SUBURBAN RUN COMPLETE</div>
+      <h1 id="lbl-run-title">PARTS SECURED!</h1>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-lbl" id="lbl-end-score">WRECK SCORE</span>
+          <strong id="end-score">0</strong>
+        </div>
+        <div class="stat-box">
+          <span class="stat-lbl" id="lbl-end-parts">PARTS COLLECTED</span>
+          <strong id="end-parts">0</strong>
+        </div>
+        <div class="stat-box">
+          <span class="stat-lbl" id="lbl-end-tier">PEAK RIG</span>
+          <strong id="end-tier">Rust-Bucket</strong>
+        </div>
+        <div class="stat-box">
+          <span class="stat-lbl" id="lbl-end-best">BEST SCORE</span>
+          <strong id="end-best">0</strong>
+        </div>
+      </div>
+      <button id="btn-again" class="cta-btn" type="button">DRIVE AGAIN</button>
+    </div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
