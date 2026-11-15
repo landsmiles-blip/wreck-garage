@@ -1,12 +1,20 @@
 import * as THREE from 'three';
+import { ECONOMY } from './economy.js';
 
-export const TIERS = [
+// minParts and dmgResist come from src/economy.js (Take 3), the one place the simulator reads too.
+// Speed, smash radius, score multiplier and visual scale are unchanged from v2.
+const TIERS_V2 = [
   { name: 'Rust-Bucket', minParts: 0, speed: 14.5, smashR: 2.0, dmgResist: 1.0, partMult: 1.0, scaleX: 1.0, scaleY: 1.0, scaleZ: 1.0 },
   { name: 'Patched Up', minParts: 10, speed: 16.5, smashR: 2.3, dmgResist: 0.84, partMult: 1.8, scaleX: 1.18, scaleY: 1.12, scaleZ: 1.08 },
   { name: 'Sporty', minParts: 34, speed: 18.6, smashR: 2.65, dmgResist: 0.70, partMult: 3.2, scaleX: 1.36, scaleY: 1.24, scaleZ: 1.18 },
   { name: 'Muscle', minParts: 82, speed: 20.6, smashR: 3.0, dmgResist: 0.55, partMult: 5.5, scaleX: 1.58, scaleY: 1.38, scaleZ: 1.30 },
   { name: 'Bulldozer-Class', minParts: 165, speed: 22.8, smashR: 3.5, dmgResist: 0.42, partMult: 9.0, scaleX: 1.88, scaleY: 1.62, scaleZ: 1.45 },
 ];
+export const TIERS = TIERS_V2.map((t, i) => ({
+  ...t,
+  minParts: ECONOMY.tiers[i].minParts,
+  dmgResist: ECONOMY.tiers[i].dmgResist,
+}));
 
 export const MODEL_MANIFEST = {
   truck: { url: 'assets/models/car-kit/truck.glb', scale: 1.55 },
@@ -44,7 +52,11 @@ const PROP_DEFS = [
   { key: 'dumpster', radius: 1.55, hp: 2, minTier: 1, dmg: 2.8, parts: 5, sfx: 'impact_metal_heavy' },
   { key: 'sedan', radius: 2.1, hp: 2, minTier: 2, dmg: 4.0, parts: 7, sfx: 'impact_metal_heavy', dropsRepair: true },
   { key: 'delivery', radius: 2.35, hp: 3, minTier: 2, dmg: 4.8, parts: 9, sfx: 'impact_metal_heavy', dropsRepair: true },
+  // The perimeter houses: visible from spawn, smashable only once the top tier opens the yard.
+  // Never chosen by pickPropDef; placed by openYard() at the houses' own positions.
+  { key: 'house', radius: 3.2, hp: ECONOMY.houseHp, minTier: 4, dmg: ECONOMY.houseDmg, parts: ECONOMY.houseParts, sfx: 'impact_metal_heavy' },
 ];
+const HOUSE_DEF = PROP_DEFS[PROP_DEFS.length - 1];
 
 const DEBRIS_KEYS = ['dPlate', 'dBumper', 'dTire', 'dDoor', 'dBolt', 'dSpoiler'];
 const ARENA_HALF = 25;
@@ -63,6 +75,10 @@ export class WreckWorld {
     this.models = models;
     this.cb = callbacks;
     this.steerMode = 'world'; // set by main.js from ?steer=; see input.js for the schemes
+    // Garage level (kept between runs) trims wear; main.js sets this before each run.
+    this.garageWearMult = 1;
+    this.arenaHalf = ARENA_HALF; // grows to ECONOMY.arenaHalfOpen when the yard opens at T5
+    this.yardOpen = false;
     this.dummy = new THREE.Object3D();
 
     this.propIMeshes = new Map();
@@ -95,7 +111,7 @@ export class WreckWorld {
       parts: 0,
       score: 0,
       elapsed: 0,
-      nextRepairTimer: 10,
+      nextRepairTimer: ECONOMY.repairFirstAt,
       ended: false,
       coastTimer: 0,
     };
@@ -157,10 +173,12 @@ export class WreckWorld {
       [-ARENA_HALF - 0.6, 0, 1.2, wallLen],
       [ARENA_HALF + 0.6, 0, 1.2, wallLen],
     ];
+    this.curbs = [];
     for (const [x, z, w, d] of sides) {
       const curb = new THREE.Mesh(new THREE.BoxGeometry(w, 0.7, d), curbMat);
       curb.position.set(x, 0.35, z);
       this.scene.add(curb);
+      this.curbs.push(curb);
     }
 
     // Suburban perimeter houses closely framing the yard (1 instanced draw call)
@@ -181,6 +199,8 @@ export class WreckWorld {
     });
     houses.instanceMatrix.needsUpdate = true;
     this.scene.add(houses);
+    this.staticHouses = houses;
+    this.houseCoords = houseCoords;
 
     // Suburban perimeter trees (1 instanced draw call)
     const tModel = this.models.tree;
@@ -309,7 +329,7 @@ export class WreckWorld {
     p.parts = 0;
     p.score = 0;
     p.elapsed = 0;
-    p.nextRepairTimer = 10;
+    p.nextRepairTimer = ECONOMY.repairFirstAt;
     p.ended = false;
     p.coastTimer = 0;
 
@@ -329,6 +349,7 @@ export class WreckWorld {
       isRampage: false,
     });
     this.syncPlayerTierVisuals(0);
+    this.closeYard();
     this.spawnProps(INITIAL_PROP_COUNT, true);
     this.spawnRepairPickup(0, -14);
     this.syncInstances();
@@ -490,9 +511,11 @@ export class WreckWorld {
     p.elapsed += dt;
     const tier = TIERS[p.tierIdx];
 
-    // Gentle structural wear + mild heat escalation after 160s (matches build/sim/final.js)
-    const heat = p.elapsed > 160 ? 1 + (p.elapsed - 160) / 210 : 1;
-    p.integrity = Math.max(0, p.integrity - (1.45 - 0.07 * p.tierIdx) * heat * dt);
+    // Structural wear + heat escalation late in the run. All constants in src/economy.js, which
+    // build/sim/take3.js simulates; garage level trims wear a little (kept between runs).
+    const E = ECONOMY;
+    const heat = p.elapsed > E.heatStart ? 1 + (p.elapsed - E.heatStart) / E.heatSpan : 1;
+    p.integrity = Math.max(0, p.integrity - (E.wearBase - E.wearPerTier * p.tierIdx) * heat * this.garageWearMult * dt);
 
     // Combo timer decay & callback
     if (this.combo.timer > 0) {
@@ -544,7 +567,7 @@ export class WreckWorld {
     p.z += p.vz * dt;
 
     // Gentle curb rebound so you never pin yourself against perimeter walls
-    const lim = ARENA_HALF - 2.0;
+    const lim = this.arenaHalf - 2.0;
     if (p.x < -lim) { p.x = -lim; p.vx = Math.abs(p.vx) * 0.5; p.yaw = Math.atan2(p.vx + 2, p.vz); }
     if (p.x > lim) { p.x = lim; p.vx = -Math.abs(p.vx) * 0.5; p.yaw = Math.atan2(p.vx - 2, p.vz); }
     if (p.z < -lim) { p.z = -lim; p.vz = Math.abs(p.vz) * 0.5; p.yaw = Math.atan2(p.vx, p.vz + 2); }
@@ -609,7 +632,13 @@ export class WreckWorld {
             this.cb.onToast?.(`+${scoreAdded}`, 'default');
           }
 
-          if (pr.def.dropsRepair && Math.random() < 0.45) {
+          this.cb.onSmash?.(pr.def.key, mult);
+          if (pr.def === HOUSE_DEF) {
+            p.shake = 1;
+            this.cb.onToast?.('HOUSE FLATTENED!', 'gold');
+          }
+
+          if (pr.def.dropsRepair && Math.random() < ECONOMY.carRepairChance) {
             this.spawnRepairPickup(pr.x, pr.z);
           }
 
@@ -631,7 +660,10 @@ export class WreckWorld {
     }
 
     // Smart wave replenishment so active smashers never stall in an empty yard
-    if (this.props.length < 18) {
+    // Houses are finite and do not count toward the refill threshold.
+    let standingHouses = 0;
+    for (const pr of this.props) if (pr.def === HOUSE_DEF) standingHouses++;
+    if (this.props.length - standingHouses < 18) {
       this.spawnProps(22, false);
       this.cb.onToast?.('FRESH DELIVERIES!', 'gold');
     }
@@ -639,7 +671,7 @@ export class WreckWorld {
     // Periodic repair pickup spawn
     p.nextRepairTimer -= dt;
     if (p.nextRepairTimer <= 0) {
-      p.nextRepairTimer = 11 + Math.random() * 3;
+      p.nextRepairTimer = ECONOMY.repairEveryMin + Math.random() * (ECONOMY.repairEveryMax - ECONOMY.repairEveryMin);
       this.spawnRepairPickup(null, null);
     }
 
@@ -648,10 +680,11 @@ export class WreckWorld {
       const rp = this.repairs[i];
       rp.phase += dt * 3.5;
       if (Math.hypot(rp.x - p.x, rp.z - p.z) < tier.smashR + 1.25) {
-        p.integrity = Math.min(100, p.integrity + 22);
+        p.integrity = Math.min(100, p.integrity + ECONOMY.repairHeal);
         this.repairs.splice(i, 1);
+        this.cb.onRepair?.();
         this.cb.onSfx?.('repair_pickup', 0.9);
-        this.cb.onToast?.('+22% INTEGRITY', 'green');
+        this.cb.onToast?.(`+${ECONOMY.repairHeal}% INTEGRITY`, 'green');
       }
     }
 
@@ -675,14 +708,46 @@ export class WreckWorld {
     const p = this.player;
     while (p.tierIdx + 1 < TIERS.length && p.parts >= TIERS[p.tierIdx + 1].minParts) {
       p.tierIdx++;
-      p.integrity = Math.min(100, p.integrity + 18);
+      p.integrity = Math.min(100, p.integrity + ECONOMY.tierUpHeal);
       p.squash = 1.24;
       p.shake = 0.7;
       this.syncPlayerTierVisuals(p.tierIdx);
       this.cb.onSfx?.('tier_up', 0.95);
       this.cb.onTierUp?.(TIERS[p.tierIdx].name);
       this.cb.onToast?.(`RIG UPGRADED: ${TIERS[p.tierIdx].name.toUpperCase()}!`, 'gold');
+      if (p.tierIdx === TIERS.length - 1) this.openYard();
     }
+  }
+
+  // Mission rewards: parts (and score at the current tier's multiplier) without a smash.
+  addBonusParts(n) {
+    const p = this.player;
+    if (p.ended) return;
+    p.parts += n;
+    p.score += Math.round(n * 10 * TIERS[p.tierIdx].partMult);
+    this.checkTierAdvance();
+  }
+
+  // Top tier: the curbs drop and the 12 houses that have stood around the yard since spawn become
+  // targets. They were the visible, unreachable "end reward" (Letter 003 device 1); no new models.
+  openYard() {
+    if (this.yardOpen) return;
+    this.yardOpen = true;
+    this.arenaHalf = ECONOMY.arenaHalfOpen;
+    for (const c of this.curbs) c.visible = false;
+    this.staticHouses.visible = false;
+    for (const [x, z, r] of this.houseCoords) {
+      this.props.push({ def: HOUSE_DEF, x, z, yaw: r, hp: HOUSE_DEF.hp, scale: 1, popVel: 0, hitFlash: 0 });
+    }
+    this.cb.onToast?.('THE YARD IS OPEN! FLATTEN THE HOUSES!', 'gold');
+    this.cb.onYardOpen?.();
+  }
+
+  closeYard() {
+    this.yardOpen = false;
+    this.arenaHalf = ARENA_HALF;
+    for (const c of this.curbs) c.visible = true;
+    this.staticHouses.visible = true;
   }
 
   updateDebris(dt) {

@@ -52,7 +52,11 @@ export class InputController {
       if (this.activePointerId !== null) return;
       this.activePointerId = e.pointerId;
       this.gestureId++;
-      this.canvas.setPointerCapture?.(e.pointerId);
+      // setPointerCapture throws if the pointer is already gone (a cancelled touch); without the
+      // guard the throw skipped the rest of this handler and the joystick kept a stale origin.
+      try {
+        this.canvas.setPointerCapture?.(e.pointerId);
+      } catch (_) {}
       this.originX = e.clientX;
       this.originY = e.clientY;
       this.curX = e.clientX;

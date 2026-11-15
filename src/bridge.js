@@ -3,6 +3,7 @@ let readySent = false;
 
 export const bridgeState = {
   bestScore: 0,
+  bank: 0, // lifetime parts banked across runs (Take 3 garage), Bridge storage key 'wreck_bank'
   language: 'en',
   platformAudio: true,
   platformPaused: false,
@@ -67,7 +68,26 @@ export async function initBridge({ onAudioChange, onPauseChange, onAdState }) {
     }
   } catch (_) {}
 
+  // Garage bank, read as its own key so the existing 'wreck_best' read and write are unchanged.
+  try {
+    const saved = await b.storage?.get?.(['wreck_bank']);
+    const raw = Array.isArray(saved) ? saved[0] : saved && typeof saved === 'object' ? saved.wreck_bank : null;
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) bridgeState.bank = parsed;
+  } catch (_) {}
+
   return bridgeState;
+}
+
+// Adds a run's parts to the lifetime bank and saves it through Bridge storage only (Playgama
+// 3.2.1: no browser-side storage API of any kind, not even as a fallback).
+export async function bankParts(parts) {
+  if (!(parts > 0)) return bridgeState.bank;
+  bridgeState.bank += Math.round(parts);
+  try {
+    await window.bridge?.storage?.set?.(['wreck_bank'], [String(bridgeState.bank)]);
+  } catch (_) {}
+  return bridgeState.bank;
 }
 
 export function sendGameReady() {

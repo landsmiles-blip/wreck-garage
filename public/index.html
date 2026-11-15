@@ -28,6 +28,7 @@
         <span id="val-tier">T1 Rust-Bucket</span>
         <div class="tier-track"><div class="tier-fill" id="tier-fill"></div></div>
       </div>
+      <div class="mission-list" id="mission-list" aria-live="polite"></div>
     </div>
 
     <div class="hud-center">
@@ -56,6 +57,7 @@
       <h2 id="lbl-paused">PAUSED</h2>
       <p id="lbl-pause-sub">Garage crew standing by.</p>
       <button id="btn-resume" class="cta-btn" type="button">RESUME</button>
+      <div class="build-tag" id="build-tag-pause"></div>
     </div>
   </div>
 
@@ -81,7 +83,13 @@
           <strong id="end-best">0</strong>
         </div>
       </div>
+      <div class="garage-box">
+        <div class="garage-head"><span id="lbl-garage">GARAGE</span> <strong id="end-garage-lv">LV 0</strong></div>
+        <div class="garage-track"><div class="garage-fill" id="end-garage-fill"></div></div>
+        <div class="garage-sub" id="end-garage-sub"></div>
+      </div>
       <button id="btn-again" class="cta-btn" type="button">DRIVE AGAIN</button>
+      <div class="build-tag" id="build-tag-end"></div>
     </div>
   </div>
 

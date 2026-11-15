@@ -424,3 +424,93 @@ body {
   .tier-pill { font-size: 11px; }
   .cue-chip { font-size: 11.5px; padding: 8px 13px; }
 }
+
+/* Take 3: three rotating missions under the tier pill */
+.mission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 190px;
+}
+
+.mission-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(18, 24, 34, 0.72);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.mission-item .mission-prog {
+  color: #ffcf4d;
+  font-variant-numeric: tabular-nums;
+}
+
+.mission-item.fresh {
+  animation: missionIn 0.45s ease-out;
+}
+
+@keyframes missionIn {
+  from { transform: translateX(-12px); opacity: 0; border-color: #ffcf4d; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Take 3: garage level kept between runs, on the end card */
+.garage-box {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0 0 14px;
+  text-align: left;
+}
+
+.garage-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #a9bacf;
+}
+
+.garage-head strong {
+  color: #ffcf4d;
+}
+
+.garage-track {
+  height: 6px;
+  margin: 6px 0 4px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.garage-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ffb02e, #ffdf5d);
+  transition: width 0.8s ease-out;
+}
+
+.garage-sub {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d8e2ee;
+}
+
+.build-tag {
+  margin-top: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+@media (max-height: 520px) {
+  .mission-list { gap: 2px; max-width: 170px; }
+  .mission-item { font-size: 10px; padding: 2px 7px; }
+}

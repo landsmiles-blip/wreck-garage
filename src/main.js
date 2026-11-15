@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { GameAudio } from './audio.js';
 import { loadAllModels } from './assetsLoader.js';
-import { bridgeState, initBridge, saveBestScore, sendGameReady, triggerInterstitial } from './bridge.js';
+import { bankParts, bridgeState, initBridge, saveBestScore, sendGameReady, triggerInterstitial } from './bridge.js';
+import { ECONOMY } from './economy.js';
+import { createMissions } from './missions.js';
 import { InputController, readSteerMode } from './input.js';
 import { createPerfProbe } from './probe.js';
 import { createSessionLog } from './session.js';
@@ -36,6 +38,17 @@ for (const [key, frame] of [['cam1', 't1'], ['cam5', 't5']]) {
 // The camera eases toward the new framing over ~0.7 s instead of following the truck's scale,
 // which snaps on tier-up (world.js syncPlayerTierVisuals). Easing it is what stops the lurch.
 const CAM_GROW_RATE = 1.5;
+
+// Shown small on the pause and end cards so a phone's build can be identified. Bump on every build
+// handed to Mumathai.
+const BUILD_TAG = 'take3 2026-11-15';
+
+// Garage level from lifetime banked parts (src/economy.js; simulated in build/sim/take3.js).
+function garageLevel(bank) {
+  let lv = 0;
+  while (lv < ECONOMY.garageMaxLevel && bank >= ECONOMY.garageLevelParts(lv + 1)) lv++;
+  return lv;
+}
 
 const STRINGS = {
   en: {
@@ -199,6 +212,42 @@ async function boot() {
   };
 
   let hudNeedsScoreSync = true;
+
+  // Missions (src/missions.js). Completing one pays bonus parts through the world so tier-ups and
+  // score stay in one place.
+  const missions = createMissions();
+  const missionList = document.getElementById('mission-list');
+  const shownMissionIds = new Set();
+  const renderMissions = () => {
+    missionList.textContent = '';
+    for (const m of missions.slots) {
+      const row = document.createElement('div');
+      row.className = `mission-item${shownMissionIds.has(m.id) ? '' : ' fresh'}`;
+      shownMissionIds.add(m.id);
+      const label = document.createElement('span');
+      label.textContent = m.text;
+      const prog = document.createElement('span');
+      prog.className = 'mission-prog';
+      prog.textContent = m.type === 'combo' ? '' : `${m.progress}/${m.target}`;
+      row.append(label, prog);
+      missionList.appendChild(row);
+    }
+  };
+  let missionsDone = 0;
+  const settleMissions = (done) => {
+    for (const d of done) {
+      missionsDone++;
+      pushToast(`MISSION DONE +${d.reward} PARTS`, 'gold');
+      audio.play('combo_fanfare', 0.8, 0.05, 1.1);
+      session.event('mission_done', { text: d.text, reward: d.reward });
+      world.addBonusParts(d.reward);
+    }
+    renderMissions();
+  };
+  const applyGarage = () => {
+    world.garageWearMult = 1 - garageLevel(bridgeState.bank) * ECONOMY.garageWearCutPerLevel;
+  };
+
   world = new WreckWorld(scene, models, {
     onSfx: (key, vol, pitch = 1.0) => audio.play(key, vol, 0.08, pitch),
     onToast: (txt, tone) => pushToast(txt, tone),
@@ -216,7 +265,10 @@ async function boot() {
     onComboFanfare: (mult) => {
       audio.play('combo_fanfare', 0.85, 0.05, mult >= 5 ? 1.25 : 1.0);
     },
+    onSmash: (key, mult) => settleMissions(missions.onSmash(key, mult, world.player.elapsed)),
+    onRepair: () => settleMissions(missions.onRepair()),
     onTierUp: () => {
+      missions.setTier(world.player.tierIdx);
       session.event('tier_up', { tierIdx: world.player.tierIdx });
       tierPill.classList.add('flash');
       setTimeout(() => tierPill.classList.remove('flash'), 650);
@@ -231,9 +283,30 @@ async function boot() {
       document.getElementById('end-parts').textContent = summary.parts.toLocaleString();
       document.getElementById('end-tier').textContent = summary.tierName;
       document.getElementById('end-best').textContent = best.toLocaleString();
+      // Garage: bank this run's parts (Bridge storage) and show progress to the next level, the
+      // reason to press Drive Again (kept between runs).
+      const lvBefore = garageLevel(bridgeState.bank);
+      const bank = await bankParts(summary.parts);
+      const lv = garageLevel(bank);
+      const from = ECONOMY.garageLevelParts(lv);
+      const to = ECONOMY.garageLevelParts(lv + 1);
+      document.getElementById('end-garage-lv').textContent = `LV ${lv}${lv > lvBefore ? '  LEVEL UP!' : ''}`;
+      if (lv >= ECONOMY.garageMaxLevel) {
+        document.getElementById('end-garage-fill').style.width = '100%';
+        document.getElementById('end-garage-sub').textContent = 'Garage maxed: your rig wears slowest.';
+      } else {
+        document.getElementById('end-garage-fill').style.width = `${(((bank - from) / (to - from)) * 100).toFixed(1)}%`;
+        document.getElementById('end-garage-sub').textContent =
+          `${(to - bank).toLocaleString()} parts to LV ${lv + 1}: each level, your rig wears ${Math.round(ECONOMY.garageWearCutPerLevel * 100)}% slower.`;
+      }
+      session.event('garage', { bank, level: lv });
       endOverlay.classList.remove('hidden');
     },
   });
+
+  applyGarage();
+  renderMissions();
+  for (const id of ['build-tag-pause', 'build-tag-end']) document.getElementById(id).textContent = BUILD_TAG;
 
   const steerMode = readSteerMode();
   world.steerMode = steerMode;
@@ -292,6 +365,9 @@ async function boot() {
     await triggerInterstitial();
     endOverlay.classList.add('hidden');
     world.resetRun();
+    missions.reset();
+    renderMissions();
+    applyGarage();
     smoothYaw = Math.PI;
     hudNeedsScoreSync = true;
     btnAgain.disabled = false;
@@ -314,6 +390,13 @@ async function boot() {
       integrity: world.player.integrity,
       tierIdx: world.player.tierIdx,
       yaw: world.player.yaw,
+      yardOpen: world.yardOpen,
+      housesStanding: world.props.filter((pr) => pr.def.key === 'house').length,
+      bank: bridgeState.bank,
+      garageLevel: garageLevel(bridgeState.bank),
+      wearMult: world.garageWearMult,
+      missions: missions.slots.map((m) => `${m.text} ${m.progress}/${m.target}`),
+      missionsDone,
       camYaw: smoothYaw,
       steerMode,
       activeProps: world.props.length,
@@ -322,6 +405,12 @@ async function boot() {
     }),
     forceEndSoonForTest: () => {
       world.player.integrity = 0.2;
+    },
+    // Test-only: put the truck at (x, z) facing yaw, for checking collisions with the houses.
+    teleportForTest: (x, z, yaw) => {
+      world.player.x = x;
+      world.player.z = z;
+      world.player.yaw = yaw;
     },
     // Test-only: jump the ladder to tier i (upward only), for camera coverage measurement.
     setTierForTest: (i) => {

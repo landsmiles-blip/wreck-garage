@@ -82,7 +82,7 @@ export function createSessionLog(host) {
       const lines = [
         `SESSION LOG  steer=${log.steer} cam=${log.cam}`,
         `on page ${fmt(t)}  first input ${fmt(log.firstInputAt)}  last input ${fmt(log.lastInputAt)}`,
-        `longest idle ${log.longestIdle.toFixed(0)}s  runs ${log.runs.length}`,
+        `longest idle ${log.longestIdle.toFixed(0)}s  runs ${log.runs.length}  missions done ${log.events.filter((e) => e.type === 'mission_done').length}  garage LV ${log.events.filter((e) => e.type === 'garage').pop()?.level ?? '-'}`,
       ];
       log.runs.forEach((r, i) => {
         const dur = (r.endedAt ?? t) - r.startedAt;
