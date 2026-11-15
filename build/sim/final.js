@@ -43,7 +43,8 @@ function simulateRun(rng, skill /* 0=passive, 0.55=casual, 0.9=repair-hunter */)
 
     // Structural wear + gentle late-run heat escalation
     const heat = elapsed > 160 ? 1 + (elapsed - 160) / 210 : 1;
-    integrity -= (1.85 - 0.08 * tierIdx) * heat * dt;
+    // Aligned with src/world.js:488 (Letter 006). It read 1.85 - 0.08*tier, a harder game than ships.
+    integrity -= (1.45 - 0.07 * tierIdx) * heat * dt;
 
     // Passive aim hits very few targets; active steering hits dense lines
     const hitProb = (0.09 + 0.84 * skill) * tier.smashSpeed * dt;
@@ -59,8 +60,9 @@ function simulateRun(rng, skill /* 0=passive, 0.55=casual, 0.9=repair-hunter */)
       score += gained;
 
       // Crushed sedans/vans drop field repair bolts on higher-skill sweeps
-      if (prop.kind === 'parked_sedan_van' && rng() < 0.25 + 0.30 * skill) {
-        integrity = Math.min(100, integrity + 11);
+      // Aligned with src/world.js:592 + :631: cars drop a +22 repair pickup 45% of the time.
+      if (prop.kind === 'parked_sedan_van' && rng() < 0.45) {
+        integrity = Math.min(100, integrity + 22);
         repairsGrabbed++;
       }
 

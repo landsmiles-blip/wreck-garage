@@ -4,10 +4,10 @@
 // those tier-ups actually happen.
 //
 // The run model is build/sim/final.js, copied and left otherwise unchanged so the two stay
-// comparable. final.js is untouched. Two constant sets are run side by side because final.js
-// does NOT match the game, despite the comment at src/world.js:486 saying it does:
-//   wear      final.js 1.85 - 0.08*tier      game world.js:488  1.45 - 0.07*tier
-//   car drop  final.js +11 at 25-55%        game world.js:592  +22 at 45% (repair pickup)
+// comparable. Two constant sets are run side by side: 'old-final' is final.js as it stood before
+// Letter 006 aligned it with the game; 'game' is the shipped game (and final.js since then):
+//   wear      old-final 1.85 - 0.08*tier      game world.js:488  1.45 - 0.07*tier
+//   car drop  old-final +11 at 25-55%        game world.js:592  +22 at 45% (repair pickup)
 // Neither set is the game: the hit model is still abstract (a per-second hit probability, not
 // geometry). Read the output as tier C. The real tier-up times come from ?session=1 on a phone.
 //
@@ -35,13 +35,14 @@ const PROPS = [
 ];
 
 const CONSTANTS = {
-  'final.js': { wearBase: 1.85, wearPerTier: 0.08, carRepair: 11, carDrop: (skill) => 0.25 + 0.30 * skill },
+  'old-final': { wearBase: 1.85, wearPerTier: 0.08, carRepair: 11, carDrop: (skill) => 0.25 + 0.30 * skill },
   'game':     { wearBase: 1.45, wearPerTier: 0.07, carRepair: 22, carDrop: () => 0.45 },
 };
 
 function simulateRun(rng, skill, K) {
   let integrity = 100, elapsed = 0, partsCount = 0, tierIdx = 0, nextRepairAt = 12;
   const tierTimes = [0];
+  const trace = []; // integrity every 30 s, for Finding 11
   const dt = 0.5;
   while (integrity > 0 && elapsed < 900) {
     elapsed += dt;
@@ -60,12 +61,13 @@ function simulateRun(rng, skill, K) {
         integrity = Math.min(100, integrity + 18);
       }
     }
+    if (elapsed % 30 === 0) trace.push(integrity);
     if (elapsed >= nextRepairAt) {
       nextRepairAt += 11 + rng() * 3;
       if (rng() < 0.08 + 0.85 * skill) integrity = Math.min(100, integrity + 22);
     }
   }
-  return { elapsed, tierTimes };
+  return { elapsed, tierTimes, trace };
 }
 
 const med = (a) => (a.length ? [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)] : null);
@@ -87,5 +89,25 @@ for (const [kName, K] of Object.entries(CONSTANTS)) {
       `${kName.padEnd(10)} ${sName.padEnd(8)} | ${f(med(runs.map((r) => r.elapsed)))}  | ${f(t[0])} | ${f(t[1])} | ${f(t[2])} | ${f(t[3])} | ` +
         `${((t5.length / N) * 100).toFixed(1).padStart(6)}%  | ${f(atT5)}    | ${share == null ? 'n/a' : (share * 100).toFixed(0) + '%'}`
     );
+  }
+}
+
+// Finding 11: does the damage clock stop at T5? Median integrity at each 30 s mark, over the runs
+// still alive at that mark (game constants). Wear itself only falls 19% from T1 to T5
+// (1.45 -> 1.17 per s); what holds integrity up is repair inflow, and what ends runs is the
+// heat multiplier after 160 s.
+{
+  const rng = createRng(20261114);
+  console.log('');
+  console.log('=== Integrity over time, game constants (median of runs alive; alive %) ===');
+  for (const [sName, skill] of SKILLS) {
+    const runs = Array.from({ length: N }, () => simulateRun(rng, skill, CONSTANTS.game));
+    const cols = [];
+    for (let k = 0; k < 24; k++) {
+      const alive = runs.filter((r) => r.trace.length > k);
+      if (alive.length < N * 0.05) break;
+      cols.push(`${(k + 1) * 30}s:${med(alive.map((r) => r.trace[k])).toFixed(0)}(${Math.round((alive.length / N) * 100)}%)`);
+    }
+    console.log(`${sName.padEnd(8)} ${cols.join(' ')}`);
   }
 }
