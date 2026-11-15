@@ -15,8 +15,8 @@ export function createSessionLog(host) {
   const t0 = performance.now();
   const now = () => (performance.now() - t0) / 1000;
   const log = {
-    steer: new URLSearchParams(window.location.search).get('steer') || 'world',
-    cam: new URLSearchParams(window.location.search).get('cam') || 'v2',
+    steer: new URLSearchParams(window.location.search).get('steer') || 'camlatch',
+    cam: new URLSearchParams(window.location.search).get('cam') || 'take3',
     firstInputAt: null,
     lastInputAt: null,
     longestIdle: 0,

@@ -7,22 +7,30 @@ import { createPerfProbe } from './probe.js';
 import { createSessionLog } from './session.js';
 import { MODEL_MANIFEST, TIERS, WreckWorld } from './world.js';
 
-// Camera trial (ledger Letters 003-006, Finding 9). ?cam=scaled pulls the chase camera back and up
-// as the truck grows, because at T5 the truck is 1.88 x 1.62 x 1.45 while v2's camera offset is a
-// constant, so the reward (growth) hides the road ahead. Default stays the shipped v2 camera
-// (Rule 11) until Mumathai picks.
-// Not "full proportional" scaling: scaling every distance by the truck's growth keeps the truck
-// the same size on screen at every tier, which erases the transformation the player earned.
-// The T5 offsets are chosen from measured screen coverage (__wreckDebug.measureCoverage), and
-// ?camT5=dist,height overrides them for tuning on the phone.
-const CAM_MODE = new URLSearchParams(window.location.search).get('cam') === 'scaled' ? 'scaled' : 'v2';
-const CAM_T5 = { portrait: { dist: 12.5, height: 7.6, look: 4.2 }, landscape: { dist: 10.8, height: 6.0, look: 5.0 } };
-{
-  const o = new URLSearchParams(window.location.search).get('camT5');
-  const [d, h] = (o || '').split(',').map(Number);
+// Chase camera (ledger Letters 003-007, Finding 9). Take 3: high and looking down ~35 deg from the
+// first second, because Mumathai found the low over-the-shoulder view unreadable at every tier,
+// not only at T5. It still turns with the car and still pulls back and up as the truck grows: the
+// v2 offsets were constant while the truck grows to 1.88 x 1.62 x 1.45, so at T5 the camera sat
+// inside the bulldozer (74% of a portrait screen, 96% of a square one, measured).
+// Not "full proportional" pull-back: if the camera backs off exactly as much as the truck grows,
+// the truck covers the same share of the screen at every tier and the growth the player earned
+// never shows. Frames are tuned from tools/measure-camera.mjs coverage plus screenshots.
+// Overrides for tuning on the phone: ?cam1=dist,height and ?cam5=dist,height. ?cam=v2 restores
+// the v2 prototype's low camera for comparison.
+const CAM_PARAMS = new URLSearchParams(window.location.search);
+const CAM_V2 = CAM_PARAMS.get('cam') === 'v2';
+const CAM_FRAMES = {
+  portrait: { t1: { dist: 8.0, height: 9.5, look: 3.0 }, t5: { dist: 12.0, height: 13.3, look: 4.0 } },
+  landscape: { t1: { dist: 8.0, height: 8.0, look: 1.0 }, t5: { dist: 12.0, height: 11.5, look: 1.5 } },
+};
+if (CAM_V2) {
+  CAM_FRAMES.portrait.t1 = CAM_FRAMES.portrait.t5 = { dist: 7.4, height: 3.8, look: 3.0 };
+  CAM_FRAMES.landscape.t1 = CAM_FRAMES.landscape.t5 = { dist: 6.4, height: 3.0, look: 3.8 };
+}
+for (const [key, frame] of [['cam1', 't1'], ['cam5', 't5']]) {
+  const [d, h] = (CAM_PARAMS.get(key) || '').split(',').map(Number);
   if (d > 0 && h > 0) {
-    CAM_T5.portrait.dist = CAM_T5.landscape.dist = d;
-    CAM_T5.portrait.height = CAM_T5.landscape.height = h;
+    for (const o of ['portrait', 'landscape']) CAM_FRAMES[o][frame] = { ...CAM_FRAMES[o][frame], dist: d, height: h };
   }
 }
 // The camera eases toward the new framing over ~0.7 s instead of following the truck's scale,
@@ -348,7 +356,7 @@ async function boot() {
           if (px[i] + px[i + 1] + px[i + 2] > 24) { all++; if (y >= h / 2) top++; }
         }
       }
-      return { tier: world.player.tierIdx + 1, camMode: CAM_MODE, w, h, cover: +(all / (w * h)).toFixed(3), coverTopHalf: +(top / (w * h / 2)).toFixed(3) };
+      return { tier: world.player.tierIdx + 1, camMode: CAM_V2 ? 'v2' : 'take3', w, h, cover: +(all / (w * h)).toFixed(3), coverTopHalf: +(top / (w * h / 2)).toFixed(3) };
     },
   };
 
@@ -385,11 +393,10 @@ async function boot() {
     // Over-the-shoulder arcade perspective
     const growTarget = (TIERS[p.tierIdx].scaleY - 1) / (TIERS[TIERS.length - 1].scaleY - 1);
     camGrow += (growTarget - camGrow) * Math.min(1, dt * CAM_GROW_RATE);
-    const g = CAM_MODE === 'scaled' ? camGrow : 0;
-    const t5 = portrait ? CAM_T5.portrait : CAM_T5.landscape;
-    const camDist = lerp(portrait ? 7.4 : 6.4, t5.dist, g);
-    const camHeight = lerp(portrait ? 3.8 : 3.0, t5.height, g);
-    const lookAhead = lerp(portrait ? 3.0 : 3.8, t5.look, g);
+    const fr = portrait ? CAM_FRAMES.portrait : CAM_FRAMES.landscape;
+    const camDist = lerp(fr.t1.dist, fr.t5.dist, camGrow);
+    const camHeight = lerp(fr.t1.height, fr.t5.height, camGrow);
+    const lookAhead = lerp(fr.t1.look, fr.t5.look, camGrow);
 
     const behindX = p.x - Math.sin(smoothYaw) * camDist;
     const behindZ = p.z - Math.cos(smoothYaw) * camDist;

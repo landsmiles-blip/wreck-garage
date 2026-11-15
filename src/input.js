@@ -1,9 +1,8 @@
 // Unified One-Handed Floating Drag Joystick (Rule 1.6.6) + Desktop WASD/Arrows (Rule 1.5.1)
 // Never binds or calls preventDefault on Escape (Rule 1.5.2 & Google Design §2).
 
-// Control-scheme trial (ledger Letter 001 / Letter 002, open item 1). ?steer= picks one; the
-// default 'world' is the shipped behaviour and stays so until Mumathai chooses (Rule 11).
-//   world    - stick direction is a world heading (shipped; the fault Mumathai found)
+// Control schemes (ledger Letters 001-007). ?steer= picks one; default is 'camlatch'.
+//   world    - stick direction is a world heading (the v2 prototype; the fault Mumathai found)
 //   cam      - stick direction is relative to the live chase camera
 //   camlatch - relative to the camera yaw captured when the touch/keypress began, so holding a
 //              sideways stick does not chase the camera round in circles
@@ -11,7 +10,9 @@
 export const STEER_MODES = ['world', 'cam', 'camlatch', 'car'];
 export function readSteerMode() {
   const m = new URLSearchParams(window.location.search).get('steer');
-  return STEER_MODES.includes(m) ? m : 'world';
+  // Default 'camlatch' since Take 3: Mumathai chose "point where to go" after playing all
+  // three. The others stay reachable only for side-by-side comparison.
+  return STEER_MODES.includes(m) ? m : 'camlatch';
 }
 
 export class InputController {
