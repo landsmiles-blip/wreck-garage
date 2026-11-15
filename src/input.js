@@ -1,6 +1,19 @@
 // Unified One-Handed Floating Drag Joystick (Rule 1.6.6) + Desktop WASD/Arrows (Rule 1.5.1)
 // Never binds or calls preventDefault on Escape (Rule 1.5.2 & Google Design §2).
 
+// Control-scheme trial (ledger Letter 001 / Letter 002, open item 1). ?steer= picks one; the
+// default 'world' is the shipped behaviour and stays so until Mumathai chooses (Rule 11).
+//   world    - stick direction is a world heading (shipped; the fault Mumathai found)
+//   cam      - stick direction is relative to the live chase camera
+//   camlatch - relative to the camera yaw captured when the touch/keypress began, so holding a
+//              sideways stick does not chase the camera round in circles
+//   car      - vehicle-relative: stick up/down is throttle, left/right turns the wheel
+export const STEER_MODES = ['world', 'cam', 'camlatch', 'car'];
+export function readSteerMode() {
+  const m = new URLSearchParams(window.location.search).get('steer');
+  return STEER_MODES.includes(m) ? m : 'world';
+}
+
 export class InputController {
   constructor(canvas, onFirstGesture) {
     this.canvas = canvas;
@@ -13,6 +26,8 @@ export class InputController {
     this.curY = 0;
     this.maxRadius = 56;
     this.movedSinceStart = false;
+    // Increments at the start of every new touch or key hold; main.js latches camera yaw on change.
+    this.gestureId = 0;
 
     this.joyEl = document.createElement('div');
     this.joyEl.className = 'joy-ring hidden';
@@ -35,6 +50,7 @@ export class InputController {
     this.canvas.addEventListener('pointerdown', (e) => {
       if (this.activePointerId !== null) return;
       this.activePointerId = e.pointerId;
+      this.gestureId++;
       this.canvas.setPointerCapture?.(e.pointerId);
       this.originX = e.clientX;
       this.originY = e.clientY;
@@ -71,6 +87,7 @@ export class InputController {
 
     window.addEventListener('keydown', (e) => {
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        if (this.keys.size === 0) this.gestureId++;
         this.keys.add(e.code);
         markStart();
       }
@@ -91,8 +108,16 @@ export class InputController {
     this.joyEl.classList.add('hidden');
   }
 
-  // Returns desired world-space XZ drive vector { x, z, magnitude }
+  // Returns the stick as { x, z, magnitude } (x right, z down-screen) plus { steer, throttle } in
+  // [-1, 1] for the vehicle-relative scheme. world.js decides which frame x/z are in.
   getVector() {
+    const v = this.readStick();
+    v.steer = v.magnitude > 0 ? v.x * v.magnitude : 0;
+    v.throttle = v.magnitude > 0 ? -v.z * v.magnitude : 0;
+    return v;
+  }
+
+  readStick() {
     let kx = 0;
     let kz = 0;
     if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) kx -= 1;

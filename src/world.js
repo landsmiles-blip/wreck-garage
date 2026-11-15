@@ -51,12 +51,18 @@ const ARENA_HALF = 25;
 const INITIAL_PROP_COUNT = 40;
 const DEBRIS_PER_MESH = 20; // 6 * 20 = 120 pooled shards total
 const MAX_REPAIRS = 6;
+// Vehicle-relative ('car') scheme only. GUESS values, to be tuned by playing on the phone.
+const CAR_TURN_RATE = 2.6; // rad/s at full stick
+// No reverse: pulling back brakes. A negative speed would make the curb rebound below (which
+// re-derives yaw from velocity) flip the car, and that shipped code is out of scope to change.
+const CAR_BRAKE = 0.02; // speed multiplier per second while braking
 
 export class WreckWorld {
   constructor(scene, models, callbacks) {
     this.scene = scene;
     this.models = models;
     this.cb = callbacks;
+    this.steerMode = 'world'; // set by main.js from ?steer=; see input.js for the schemes
     this.dummy = new THREE.Object3D();
 
     this.propIMeshes = new Map();
@@ -459,7 +465,8 @@ export class WreckWorld {
     }
   }
 
-  update(dt, inputVec) {
+  // camYaw: the yaw the input is read relative to in 'cam'/'camlatch' (main.js supplies it).
+  update(dt, inputVec, camYaw = Math.PI) {
     const p = this.player;
 
     if (p.ended) {
@@ -506,8 +513,21 @@ export class WreckWorld {
 
     // Steering & momentum
     const targetMag = inputVec.magnitude;
-    if (targetMag > 0.05) {
-      const desiredYaw = Math.atan2(inputVec.x, inputVec.z);
+    if (this.steerMode === 'car') {
+      // Heading (sin yaw, cos yaw) turns toward screen-right as yaw DEcreases, hence the minus.
+      // Sign checked on screen, not only derived (Letter 001 asked for exactly that).
+      p.yaw -= inputVec.steer * CAR_TURN_RATE * dt;
+      const thr = inputVec.throttle;
+      if (thr > 0.05) p.speed += (tier.speed * (0.45 + 0.55 * thr) - p.speed) * Math.min(1, dt * 6.5);
+      else if (thr < -0.05) p.speed *= Math.pow(CAR_BRAKE, dt);
+      else p.speed *= Math.pow(0.04, dt);
+    } else if (targetMag > 0.05) {
+      // Stick x/z are screen axes. 'world' reads them as world axes, which only coincides with
+      // the screen while the chase camera faces -Z (yaw = PI, the spawn heading); that is the
+      // fault. The camera schemes rotate by (camYaw - PI): Letter 001 proposed + camYaw, which is
+      // off by PI and drives screen-up straight at the camera.
+      const frame = this.steerMode === 'world' ? 0 : camYaw - Math.PI;
+      const desiredYaw = Math.atan2(inputVec.x, inputVec.z) + frame;
       let diff = desiredYaw - p.yaw;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;

@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { GameAudio } from './audio.js';
 import { loadAllModels } from './assetsLoader.js';
 import { bridgeState, initBridge, saveBestScore, sendGameReady, triggerInterstitial } from './bridge.js';
-import { InputController } from './input.js';
+import { InputController, readSteerMode } from './input.js';
 import { createPerfProbe } from './probe.js';
+import { createSessionLog } from './session.js';
 import { MODEL_MANIFEST, TIERS, WreckWorld } from './world.js';
 
 const STRINGS = {
@@ -62,6 +63,20 @@ async function boot() {
   const btnAgain = document.getElementById('btn-again');
 
   const audio = new GameAudio();
+  const session = createSessionLog(window);
+  // Session panels live inside the pause and end cards only, so the log never shows during play.
+  const sessionPanels = [];
+  if (session.enabled) {
+    for (const id of ['pause-overlay', 'end-overlay']) {
+      const panel = document.createElement('pre');
+      panel.style.cssText =
+        'margin:10px 0 0;padding:6px 8px;border-radius:8px;background:rgba(12,16,24,0.85);color:#9ef0b8;' +
+        'font:600 10px/1.35 ui-monospace,monospace;text-align:left;white-space:pre-wrap;max-height:30vh;overflow:auto;';
+      document.querySelector(`#${id} .card`).appendChild(panel);
+      sessionPanels.push(panel);
+    }
+  }
+  const renderSession = () => sessionPanels.forEach((el) => session.render(el));
   let manualPause = false;
   let contextLost = false;
   let world = null;
@@ -73,6 +88,7 @@ async function boot() {
     audio.setPlatformAllowed(bridgeState.platformAudio);
     audio.setPaused(paused);
     if (manualPause && (!world || !world.player.ended)) {
+      renderSession();
       pauseOverlay.classList.remove('hidden');
     } else {
       pauseOverlay.classList.add('hidden');
@@ -171,12 +187,15 @@ async function boot() {
       audio.play('combo_fanfare', 0.85, 0.05, mult >= 5 ? 1.25 : 1.0);
     },
     onTierUp: () => {
+      session.event('tier_up', { tierIdx: world.player.tierIdx });
       tierPill.classList.add('flash');
       setTimeout(() => tierPill.classList.remove('flash'), 650);
     },
     onRunEnded: async (summary) => {
       input.clearPointer();
       comboPill.classList.add('hidden');
+      session.event('run_end', { score: summary.score, parts: summary.parts, tier: summary.tierName });
+      renderSession();
       const best = await saveBestScore(summary.score);
       document.getElementById('end-score').textContent = summary.score.toLocaleString();
       document.getElementById('end-parts').textContent = summary.parts.toLocaleString();
@@ -185,6 +204,11 @@ async function boot() {
       endOverlay.classList.remove('hidden');
     },
   });
+
+  const steerMode = readSteerMode();
+  world.steerMode = steerMode;
+  let latchedYaw = Math.PI;
+  let latchedGesture = -1;
 
   const input = new InputController(canvas, () => {
     audio.unlockAndStartMusic();
@@ -203,6 +227,7 @@ async function boot() {
     audio.unlockAndStartMusic();
     audio.play('ui_click', 0.6);
     manualPause = !manualPause;
+    session.event(manualPause ? 'pause' : 'resume');
     syncPauseAndAudio();
   });
 
@@ -230,6 +255,7 @@ async function boot() {
   btnAgain.addEventListener('click', async () => {
     audio.unlockAndStartMusic();
     audio.play('ui_click', 0.65);
+    session.event('drive_again');
     btnAgain.disabled = true;
     await triggerInterstitial();
     endOverlay.classList.add('hidden');
@@ -255,6 +281,9 @@ async function boot() {
       parts: world.player.parts,
       integrity: world.player.integrity,
       tierIdx: world.player.tierIdx,
+      yaw: world.player.yaw,
+      camYaw: smoothYaw,
+      steerMode,
       activeProps: world.props.length,
       ended: world.player.ended,
       calls: renderer.info.render.calls,
@@ -274,7 +303,13 @@ async function boot() {
 
     if (!isGamePaused()) {
       const vec = input.getVector();
-      world.update(dt, vec);
+      // 'camlatch' reads the stick against the camera yaw from when this touch/hold began.
+      if (input.gestureId !== latchedGesture) {
+        latchedGesture = input.gestureId;
+        latchedYaw = smoothYaw;
+      }
+      world.update(dt, vec, steerMode === 'camlatch' ? latchedYaw : smoothYaw);
+      session.frame(world.player, vec.magnitude > 0);
       hudNeedsScoreSync = true;
     }
 
